@@ -14,8 +14,8 @@ android {
         applicationId = "com.happwner"
         minSdk = 21
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.3"
+        versionCode = 6
+        versionName = "1.4.0-derskii"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -37,12 +37,12 @@ android {
 
     signingConfigs {
         create("release") {
-            val storePath = keystoreProperties["RELEASE_STORE_FILE"]?.toString()
+            val storePath = System.getenv("RELEASE_STORE_FILE") ?: keystoreProperties["RELEASE_STORE_FILE"]?.toString()
             if (storePath != null) {
                 storeFile = file(storePath)
-                storePassword = keystoreProperties["RELEASE_STORE_PASSWORD"]?.toString()
-                keyAlias = keystoreProperties["RELEASE_KEY_ALIAS"]?.toString()
-                keyPassword = keystoreProperties["RELEASE_KEY_PASSWORD"]?.toString()
+                storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: keystoreProperties["RELEASE_STORE_PASSWORD"]?.toString()
+                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: keystoreProperties["RELEASE_KEY_ALIAS"]?.toString()
+                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: keystoreProperties["RELEASE_KEY_PASSWORD"]?.toString()
             }
         }
     }
@@ -86,6 +86,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     compileOnly("de.robv.android.xposed:api:82")
     testImplementation(libs.junit)
+    testImplementation("org.json:json:20240303")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

@@ -1,0 +1,10 @@
+<resources>
+    <string-array name="request_devices">
+        <item>Android</item>
+        <item>Android TV</item>
+        <item>iPhone / iOS</item>
+        <item>Windows</item>
+        <item>macOS</item>
+        <item>Linux</item>
+    </string-array>
+</resources>

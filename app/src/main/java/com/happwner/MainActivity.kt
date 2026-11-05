@@ -45,8 +45,6 @@ import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
@@ -99,6 +97,28 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnPasteUrlManual: ImageButton
 
     private var fullResponseText: String = ""
+    private var fetchJob: kotlinx.coroutines.Job? = null
+    private var pendingExportText: String? = null
+    private val exportLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val text = pendingExportText
+        pendingExportText = null
+        val uri = result.data?.data
+        if (result.resultCode == RESULT_OK && uri != null && text != null) {
+            lifecycleScope.launch {
+                try {
+                    withContext(Dispatchers.IO) {
+                        val stream = contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open document")
+                        stream.bufferedWriter(Charsets.UTF_8).use { it.write(text) }
+                    }
+                    Toast.makeText(this@MainActivity, R.string.export_saved, Toast.LENGTH_SHORT).show()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    Toast.makeText(this@MainActivity, R.string.export_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
     private val MAX_DISPLAY_CHARS by lazy { resources.getInteger(R.integer.max_display_chars) }
     private var lastFetchTapMs = 0L
     private var lastGetSubTapMs = 0L
@@ -543,13 +563,42 @@ class MainActivity : AppCompatActivity() {
         // Copy / clear the output
         btnCopyOutput.setOnClickListener {
             if (fullResponseText.isNotEmpty() && fullResponseText != getString(R.string.label_result_default) && fullResponseText != getString(R.string.msg_loading)) {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("Happwner Result", fullResponseText)
-                clipboard.setPrimaryClip(clip)
+                if (fullResponseText.toByteArray(Charsets.UTF_8).size > 256 * 1024) {
+                    Toast.makeText(this, R.string.clipboard_too_large, Toast.LENGTH_LONG).show()
+                    exportSubscription()
+                } else {
+                    try {
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Happwner Result", fullResponseText))
+                    } catch (_: RuntimeException) {
+                        Toast.makeText(this, R.string.clipboard_too_large, Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
 
+        findViewById<View>(R.id.btnExportOutput).setOnClickListener { exportSubscription() }
+        val deviceButton = findViewById<Button>(R.id.btnRequestDevice)
+        fun updateDeviceLabel() {
+            val index = RequestDevice.ids.indexOf(selectedDevice())
+            deviceButton.text = getString(R.string.request_device, resources.getStringArray(R.array.request_devices)[index])
+        }
+        updateDeviceLabel()
+        deviceButton.setOnClickListener {
+            AnimatedDialogBuilder(this)
+                .setTitle(R.string.device_select_title)
+                .setSingleChoiceItems(R.array.request_devices, RequestDevice.ids.indexOf(selectedDevice())) { dialog, index ->
+                    prefs.edit().putString("request_device", RequestDevice.ids[index]).apply()
+                    updateDeviceLabel()
+                    dialog.dismiss()
+                }.show()
+        }
+
         btnClearOutput.setOnClickListener {
+            ++fetchGeneration
+            fetchJob?.cancel()
+            loadingPhaseRunning = false
+            pendingConfigText = null
             mainContainer.beginDelayedTransitionIfEnabled(fastTransition)
             fullResponseText = ""
             outputExpandAborted = true
@@ -650,7 +699,7 @@ class MainActivity : AppCompatActivity() {
                     val encodedUrl = URLEncoder.encode(urlString, "UTF-8")
                     val encodedHwid = URLEncoder.encode(hwid, "UTF-8")
                     val encodedUa = URLEncoder.encode(userAgent, "UTF-8")
-                    val bridgeUrl = "http://127.0.0.1:8166/url=$encodedUrl&hwid=$encodedHwid&ua=$encodedUa"
+                    val bridgeUrl = "http://127.0.0.1:8166/url=$encodedUrl&hwid=$encodedHwid&ua=$encodedUa&device=${selectedDevice()}"
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     val clip = ClipData.newPlainText("Happwner Bridge URL", bridgeUrl)
                     clipboard.setPrimaryClip(clip)
@@ -699,9 +748,10 @@ class MainActivity : AppCompatActivity() {
             if (nowMs - lastFetchTapMs < 500) return@setOnClickListener
             lastFetchTapMs = nowMs
             currentFocus?.clearFocus()
-            val urlString = inputUrl.text.toString().replace("\n", "").replace("\r", "")
-            val hwid = inputHwid.text.toString()
-            val userAgent = inputUserAgent.text.toString().replace("\n", "").replace("\r", "")
+            val urlString = inputUrl.text.toString().replace("\n", "").replace("\r", "").trim()
+            val hwid = inputHwid.text.toString().trim()
+            val userAgent = inputUserAgent.text.toString().replace("\n", "").replace("\r", "").trim()
+            val device = selectedDevice()
 
             if (urlString.startsWith("happ://crypt")) {
                 Toast.makeText(this, getString(R.string.error_decrypt_first), Toast.LENGTH_SHORT).show()
@@ -754,6 +804,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             val gen = ++fetchGeneration
+            fetchJob?.cancel()
             pendingConfigText = null
             loadingPhaseRunning = true
             fullResponseText = ""
@@ -779,33 +830,35 @@ class MainActivity : AppCompatActivity() {
             }
 
             // Off the main thread: fetch, decrypt, convert, then render with labels
-            lifecycleScope.launch {
-                val resp = makeRequest(urlString, hwid, userAgent)
+            fetchJob = lifecycleScope.launch {
+              try {
+                val resp = makeRequest(urlString, hwid, userAgent, device)
                 val jsonToUri = prefs.getBoolean("process_manual", true)
                 val tryB64 = prefs.getBoolean("process_b64_manual", true)
                 val xrayToSb = prefs.getBoolean("process_xray_manual", false)
 
                 var wasDecrypted = false
-                val stats = when (val r = HappCrypto.process(urlString, resp.body, resp.headers)) {
+                var decryptFailure: String? = null
+                val stats = withContext(Dispatchers.Default) {
+                  if (!resp.successful) LinkConverter.ConversionStats(resp.body, 0)
+                  else when (val r = HappCrypto.process(urlString, resp.body, resp.headers)) {
                     is HappCrypto.Result.Success -> {
                         wasDecrypted = true
                         LinkConverter.convertWithStats(r.plaintext, jsonToUri, tryB64, xrayToSb)
                     }
                     is HappCrypto.Result.Failed -> {
-                        Toast.makeText(
-                            this@MainActivity,
-                            getString(R.string.toast_decrypt_failed, r.keyName, r.reason),
-                            Toast.LENGTH_LONG
-                        ).show()
+                        decryptFailure = getString(R.string.toast_decrypt_failed, r.keyName, r.reason)
                         LinkConverter.convertWithStats(r.originalBody, jsonToUri, tryB64, xrayToSb)
                     }
                     HappCrypto.Result.NotEncrypted ->
                         LinkConverter.convertWithStats(resp.body, jsonToUri, tryB64, xrayToSb)
+                  }
                 }
+                if (gen != fetchGeneration) return@launch
+                decryptFailure?.let { Toast.makeText(this@MainActivity, it, Toast.LENGTH_LONG).show() }
                 val converted = stats.text
                 val xraySkipped = stats.xraySkipped
 
-                val isTruncated = converted.length > MAX_DISPLAY_CHARS
                 val accent = MaterialColors.getColor(
                     this@MainActivity, R.attr.happAccent,
                     ContextCompat.getColor(this@MainActivity, R.color.brand_purple_secondary)
@@ -828,42 +881,25 @@ class MainActivity : AppCompatActivity() {
                 }
                 if (prefix.isNotEmpty()) prefix.append("\n\n")
 
-                // Full result captured for the expand handler (shown via one setText on tap)
-                val expandPrefix: CharSequence = SpannableStringBuilder(prefix)
-                val expandBody: String = converted
-
-                // Initial text: truncated body with a clickable "show full", or the full text if short enough
-                val newText: CharSequence = if (isTruncated) {
-                    val showFullSpan = object : ClickableSpan() {
-                        override fun onClick(widget: View) {
-                            if (gen != fetchGeneration) return
-                            expandOutputToFull(expandPrefix, expandBody, gen)
-                        }
-                        override fun updateDrawState(ds: TextPaint) {
-                            ds.color = accent
-                            ds.isUnderlineText = true
-                        }
-                    }
-                    SpannableStringBuilder(prefix)
-                        .append(converted.take(MAX_DISPLAY_CHARS))
-                        .append(getString(R.string.msg_text_truncated))
-                        .apply {
-                            val start = length
-                            append(getString(R.string.msg_show_full))
-                            setSpan(showFullSpan, start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-                        }
-                } else {
-                    SpannableStringBuilder(prefix).append(converted)
-                }
+                val newText = outputPage(prefix, converted, gen, 0)
 
                 if (gen != fetchGeneration) return@launch
-                fullResponseText = converted
+                fullResponseText = if (resp.successful) converted else ""
 
                 if (loadingPhaseRunning) {
                     pendingConfigText = newText
                 } else {
                     output.crossfadeContent { showOutputText(newText) }
                 }
+              } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+              } catch (e: Exception) {
+                if (gen != fetchGeneration) return@launch
+                fullResponseText = ""
+                val message = getString(R.string.request_failed, e.message ?: e.javaClass.simpleName)
+                if (loadingPhaseRunning) pendingConfigText = message
+                else output.crossfadeContent { showOutputText(message) }
+              }
             }
         }
 
@@ -1271,121 +1307,46 @@ class MainActivity : AppCompatActivity() {
         outputWaitLabel.visibility = View.GONE
     }
 
-    // Expand to full text: fade the result out, swap text (keeping scroll, no jump), fade back in
-    private fun expandOutputToFull(prefix: CharSequence, body: String, gen: Int) {
-        if (outputExpanding) return
-        outputExpanding = true
-        outputExpandAborted = false
-
-        // Label prefix (if any) + full body
-        val fullText: CharSequence = if (prefix.isEmpty()) body else SpannableStringBuilder(prefix).append(body)
-        val duration = resources.getInteger(R.integer.duration_standard_transition).toLong()
-        val animate = !skipProgrammaticAnimations()
-
-        // Swap text + restore scroll, then fade the full text in
-        val swapAndReveal = {
-            if (!outputExpandAborted && gen == fetchGeneration && output.visibility == View.VISIBLE) {
-                val scrollView = findViewById<ScrollView>(R.id.mainScrollView)
-                val keepY = scrollView?.scrollY ?: 0
-
-                val hadFocusable = output.isFocusableInTouchMode
-                output.isFocusableInTouchMode = false
-                output.animate().cancel()
-                try {
-                    output.text = fullText
-                } catch (_: Throwable) {
-                }
-                if (!output.isTextSelectable) {
-                    output.setTextIsSelectable(true)
-                }
-                output.movementMethod = OutputLinkMovementMethod.getInstance()
-                (output.text as? Spannable)?.let { android.text.Selection.removeSelection(it) }
-                output.isFocusableInTouchMode = hadFocusable
-                applyOutputScrollbar()
-
-                if (scrollView != null) {
-                    scrollView.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
-                        override fun onPreDraw(): Boolean {
-                            scrollView.viewTreeObserver.removeOnPreDrawListener(this)
-                            scrollView.scrollY = keepY
-                            return true
-                        }
-                    })
-                }
-
-                if (animate) {
-                    output.alpha = 0f
-                    // The wait label fades out as the full text fades in; the full text is now interactive
-                    blockOutputTouch = false
-                    outputWaitLabel.animate().cancel()
-                    outputWaitLabel.animate().alpha(0f).setDuration(duration).withLayer().withEndAction {
-                        outputWaitLabel.visibility = View.GONE
-                    }.start()
-                    output.animate().alpha(1f).setDuration(duration).withLayer().withEndAction {
-                        outputExpanding = false
-                    }.start()
-                } else {
-                    output.alpha = 1f
-                    hideWaitLabel()
-                    outputExpanding = false
-                }
-            } else {
-                output.alpha = 1f
-                hideWaitLabel()
-                outputExpanding = false
+    // Replace the page instead of growing the TextView without bound. Export always uses the full body.
+    private fun outputPage(prefix: CharSequence, body: String, gen: Int, start: Int): CharSequence {
+        val end = SubscriptionPreview.end(body, start + SubscriptionPreview.PAGE_CHARS)
+        val text = SpannableStringBuilder(prefix).append(body.substring(start, end))
+        if (body.length > SubscriptionPreview.PAGE_CHARS) {
+            text.append(getString(R.string.preview_page, start + 1, end, body.length))
+            fun link(label: Int, next: Int) {
+                text.append("  ")
+                val offset = text.length
+                text.append(getString(label))
+                text.setSpan(object : ClickableSpan() {
+                    override fun onClick(widget: View) {
+                        if (gen == fetchGeneration) showOutputText(outputPage(prefix, body, gen, next))
+                    }
+                }, offset, text.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
+            if (start > 0) link(R.string.preview_first, 0)
+            if (end < body.length) link(R.string.preview_next, end)
         }
+        return text
+    }
 
-        // Start the fade-out immediately on tap; the heavy work runs under it
-        var fadeDone = !animate
-        var warmDone = false
-        val proceed = { if (fadeDone && warmDone) swapAndReveal() }
+    private fun selectedDevice(): String = RequestDevice.normalize(prefs.getString("request_device", "android"))
 
-        if (animate) {
-            output.animate().cancel()
-            outputWaitLabel.animate().cancel()
-            // The wait label fades in over the visible result area as the truncated text fades out
-            blockOutputTouch = true
-            outputWaitLabel.alpha = 0f
-            outputWaitLabel.visibility = View.VISIBLE
-            outputWaitLabel.animate().alpha(1f).setDuration(duration).withLayer().start()
-            output.animate().alpha(0f).setDuration(duration).withLayer().withEndAction {
-                fadeDone = true
-                proceed()
-            }.start()
-        } else {
-            // No animations: show the wait label instantly while the heavy work runs
-            output.animate().cancel()
-            blockOutputTouch = true
-            output.alpha = 0f
-            outputWaitLabel.animate().cancel()
-            outputWaitLabel.alpha = 1f
-            outputWaitLabel.visibility = View.VISIBLE
+    private fun exportSubscription() {
+        if (fullResponseText.isEmpty()) {
+            Toast.makeText(this, R.string.export_empty, Toast.LENGTH_SHORT).show()
+            return
         }
-
-        expandJob?.cancel()
-        expandJob = lifecycleScope.launch {
-            // Warm the text-layout cache off the UI thread (helps setText where supported)
-            withContext(Dispatchers.Default) {
-                try {
-                    val params = TextViewCompat.getTextMetricsParams(output)
-                    PrecomputedTextCompat.create(fullText, params)
-                } catch (_: Throwable) {
-                }
-            }
-            if (gen != fetchGeneration) {
-                outputExpanding = false
-                return@launch
-            }
-            warmDone = true
-            proceed()
-        }
-        // If the job is cancelled mid-warm (collapse/new fetch), never leave the flag stuck or label shown
-        expandJob?.invokeOnCompletion { cause ->
-            if (cause != null) output.post {
-                outputExpanding = false
-                hideWaitLabel()
-            }
+        val name = SubscriptionPreview.fileName(fullResponseText)
+        pendingExportText = fullResponseText
+        try {
+            exportLauncher.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = if (name.endsWith(".json")) "application/json" else "text/plain"
+                putExtra(Intent.EXTRA_TITLE, name)
+            })
+        } catch (_: ActivityNotFoundException) {
+            pendingExportText = null
+            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -1887,6 +1848,10 @@ class MainActivity : AppCompatActivity() {
     private fun uaForMode(mode: String): String = when (mode) {
         "v2raytun" -> getString(R.string.ua_default_v2raytun)
         "incy" -> buildPresetUa(R.string.ua_default_incy, arrayOf(PrefsManager.INCY_PKG))
+        "v2rayng" -> buildPresetUa(R.string.ua_default_v2rayng, arrayOf("com.v2ray.ang"))
+        "hiddify" -> buildPresetUa(R.string.ua_default_hiddify, arrayOf("app.hiddify.com"))
+        "singbox" -> getString(R.string.ua_default_singbox)
+        "mihomo" -> getString(R.string.ua_default_mihomo)
         else -> buildPresetUa(R.string.ua_default_happ, arrayOf(PrefsManager.HAPP_PKG_PRIMARY, PrefsManager.HAPP_PKG_SECONDARY))
     }
 
@@ -1895,38 +1860,18 @@ class MainActivity : AppCompatActivity() {
         return getSafePrefs(this).getString("custom_user_agent", "") ?: ""
     }
 
-    // Dialog to pick one of 3 preset User-Agents; the field stays editable for manual tweaks
+    // Installed versions take precedence; custom strings remain editable.
     private fun showUaSelectDialog() {
         val current = inputUserAgent.text.toString().trim()
-        val dialogView = layoutInflater.inflate(R.layout.dialog_select_option, null)
-        val rg = dialogView.findViewById<android.widget.RadioGroup>(R.id.dialogRadioGroup)
-        val r1 = dialogView.findViewById<com.google.android.material.radiobutton.MaterialRadioButton>(R.id.radioOption1)
-        val r2 = dialogView.findViewById<com.google.android.material.radiobutton.MaterialRadioButton>(R.id.radioOption2)
-        val r3 = dialogView.findViewById<com.google.android.material.radiobutton.MaterialRadioButton>(R.id.radioOption3)
-        val happUa = uaForMode("happ")
-        val v2rayUa = uaForMode("v2raytun")
-        val incyUa = uaForMode("incy")
-        r1.text = happUa
-        r2.text = v2rayUa
-        r3.text = incyUa
-        when (current) {
-            v2rayUa -> r2.isChecked = true
-            incyUa -> r3.isChecked = true
-            happUa -> r1.isChecked = true
-        }
-        val dialog = AnimatedDialogBuilder(this)
+        val values = listOf("", uaForMode("happ"), uaForMode("v2raytun"), uaForMode("incy"),
+            uaForMode("v2rayng"), uaForMode("hiddify"), uaForMode("singbox"), uaForMode("mihomo"))
+        val labels = values.map { it.ifEmpty { getString(R.string.ua_system_default) } }.toTypedArray()
+        AnimatedDialogBuilder(this)
             .setTitle(getString(R.string.ua_select_title))
-            .setView(dialogView)
-            .showAnimated()
-        rg.setOnCheckedChangeListener { _, checkedId ->
-            val picked = when (checkedId) {
-                R.id.radioOption2 -> v2rayUa
-                R.id.radioOption3 -> incyUa
-                else -> happUa
-            }
-            inputUserAgent.crossfadeText(picked) { refreshFieldStyle(layoutUserAgent, inputUserAgent) }
-            try { dialog.dismiss() } catch (_: Throwable) {}
-        }
+            .setSingleChoiceItems(labels, values.indexOf(current)) { dialog, index ->
+                inputUserAgent.crossfadeText(values[index]) { refreshFieldStyle(layoutUserAgent, inputUserAgent) }
+                dialog.dismiss()
+            }.show()
     }
 
     private fun fromHtml(text: String): CharSequence {
@@ -2136,47 +2081,12 @@ class MainActivity : AppCompatActivity() {
         try { unregisterReceiver(receiver) } catch (e: Exception) {}
     }
 
-    private data class HappResp(val body: String, val headers: Map<String, List<String>>)
-
-    // Read the body with explicit UTF-8 and a size cap, to guard against OOM on a huge response
-    private fun readBodyCapped(input: java.io.InputStream): String {
-        val maxBytes = 32L * 1024 * 1024 // 32 MB; any real subscription is far smaller
-        val out = java.io.ByteArrayOutputStream()
-        val chunk = ByteArray(16 * 1024)
-        var total = 0L
-        input.use {
-            while (true) {
-                val n = it.read(chunk)
-                if (n < 0) break
-                total += n
-                if (total > maxBytes) throw java.io.IOException("Response body exceeds size limit")
-                out.write(chunk, 0, n)
-            }
+    private suspend fun makeRequest(url: String, hwid: String, ua: String, device: String): SubscriptionHttpClient.Response =
+        withContext(Dispatchers.IO) {
+            SubscriptionHttpClient.fetch(url, hwid, RequestDevice.userAgent(ua, device),
+                RequestDevice.headers(device, Build.VERSION.RELEASE, Build.MODEL),
+                resources.getInteger(R.integer.network_timeout_ms))
         }
-        return out.toString("UTF-8")
-    }
-
-    // GET the subscription: x-hwid + User-Agent, grab the body and headers
-    private suspend fun makeRequest(url: String, hwid: String, ua: String): HappResp = withContext(Dispatchers.IO) {
-        var conn: HttpURLConnection? = null
-        val timeout = resources.getInteger(R.integer.network_timeout_ms)
-        try {
-            conn = URL(url).openConnection() as HttpURLConnection
-            conn.apply {
-                requestMethod = "GET"
-                setRequestProperty("x-hwid", hwid)
-                if (ua.isNotBlank()) setRequestProperty("User-Agent", ua)
-                connectTimeout = timeout
-                readTimeout = timeout
-            }
-            val headers = conn.headerFields.filterKeys { it != null }
-            val body = if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                readBodyCapped(conn.inputStream)
-            } else "Error: ${conn.responseCode}"
-            HappResp(body, headers)
-        } catch (e: Exception) { HappResp("Error: ${e.message}", emptyMap()) }
-        finally { conn?.disconnect() }
-    }
 
     // Pick the URL field color by state (error / encrypted / normal)
     private fun getUrlCurrentColor(): Int {

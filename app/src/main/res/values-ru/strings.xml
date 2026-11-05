@@ -147,4 +147,16 @@
     <string name="setting_monet_accent_desc">Динамический цвет на основе обоев главного экрана</string>
 
     <string name="ua_select_title">Выбор User-Agent</string>
+    <string name="ua_system_default">Системный (без переопределения)</string>
+    <string name="device_select_title">Устройство для запроса</string>
+    <string name="request_device">Запрос от: %1$s</string>
+    <string name="export_subscription">Сохранить подписку в файл</string>
+    <string name="export_empty">Сначала загрузите подписку</string>
+    <string name="export_saved">Подписка сохранена</string>
+    <string name="export_failed">Не удалось сохранить файл. Выберите другое место.</string>
+    <string name="clipboard_too_large">Слишком много данных для буфера обмена. Сохраните их в файл.</string>
+    <string name="request_failed">Ошибка запроса: %1$s</string>
+    <string name="preview_page">\n\nПросмотр: %1$d–%2$d из %3$d символов. Полная подписка доступна при сохранении в файл.\n</string>
+    <string name="preview_next">Следующая страница</string>
+    <string name="preview_first">В начало</string>
 </resources>

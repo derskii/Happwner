@@ -17,11 +17,9 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
-import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.URL
 import java.util.*
 
 class SubscriptionService : Service() {
@@ -178,7 +176,7 @@ class SubscriptionService : Service() {
                     if (serverSocket == null || serverSocket!!.isClosed) {
                         serverSocket = ServerSocket().apply {
                             reuseAddress = true
-                            bind(InetSocketAddress(8166)) // fixed bridge port
+                            bind(InetSocketAddress("127.0.0.1", 8166))
                         }
                     }
                 }
@@ -219,7 +217,6 @@ class SubscriptionService : Service() {
 
                 BufferedReader(InputStreamReader(nonClosingInput, Charsets.UTF_8)).use { reader ->
                     val line = reader.readLine() ?: return@use
-                    Log.d("Happwner:Server", "Request line: $line")
                     val parts = line.split(" ")
                     if (parts.size < 2) return@use
 
@@ -239,9 +236,14 @@ class SubscriptionService : Service() {
                         val targetUrl = params["url"]
                         val hwid = params["hwid"] ?: ""
                         val ua = params["ua"] ?: ""
+                        val device = RequestDevice.normalize(params["device"])
 
                         if (targetUrl != null) {
-                            val response = fetchSubscription(targetUrl, hwid, ua)
+                            val response = fetchSubscription(targetUrl, hwid, ua, device)
+                            if (!response.successful) {
+                                sendError(output, response.status, response.body)
+                                return@use
+                            }
                             val prefs = PrefsManager.getSafePrefs(this@SubscriptionService)
                             val jsonToUri = prefs.getBoolean("process_server", false)
                             val tryB64 = prefs.getBoolean("process_b64_server", false)
@@ -269,8 +271,11 @@ class SubscriptionService : Service() {
                         sendError(output, 404, "Not Found")
                     }
                 }
-            } catch (e: Throwable) {
-                Log.e("Happwner:Server", "Error handling client: ${e.message}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("Happwner:Server", "Bridge request failed: ${e.javaClass.simpleName}")
+                try { sendError(socket.getOutputStream(), 502, "Subscription request failed") } catch (_: Exception) {}
             } finally {
                 try {
                     socket.outputStream.flush()
@@ -299,52 +304,11 @@ class SubscriptionService : Service() {
         return map
     }
 
-    data class ProxyResponse(val body: String, val headers: Map<String, List<String>>)
-
-    // Read the body with explicit UTF-8 and a size cap, to guard against OOM on a huge response
-    private fun readBodyCapped(input: InputStream): String {
-        val maxBytes = 32L * 1024 * 1024 // 32 MB; any real subscription is far smaller
-        val out = java.io.ByteArrayOutputStream()
-        val chunk = ByteArray(16 * 1024)
-        var total = 0L
-        input.use {
-            while (true) {
-                val n = it.read(chunk)
-                if (n < 0) break
-                total += n
-                if (total > maxBytes) throw java.io.IOException("Response body exceeds size limit")
-                out.write(chunk, 0, n)
-            }
+    private suspend fun fetchSubscription(url: String, hwid: String, ua: String, device: String): SubscriptionHttpClient.Response =
+        withContext(Dispatchers.IO) {
+            SubscriptionHttpClient.fetch(url, hwid, RequestDevice.userAgent(ua, device),
+                RequestDevice.headers(device, Build.VERSION.RELEASE, Build.MODEL))
         }
-        return out.toString("UTF-8")
-    }
-
-    // GET the subscription with x-hwid + User-Agent; capture body and headers
-    private suspend fun fetchSubscription(url: String, hwid: String, ua: String): ProxyResponse = withContext(Dispatchers.IO) {
-        var conn: HttpURLConnection? = null
-        try {
-            conn = URL(url).openConnection() as HttpURLConnection
-            conn.apply {
-                requestMethod = "GET"
-                setRequestProperty("x-hwid", hwid)
-                if (ua.isNotBlank()) setRequestProperty("User-Agent", ua)
-                connectTimeout = 15000 // 15s
-                readTimeout = 15000 // 15s
-            }
-
-            val headers = conn.headerFields.filterKeys { it != null }
-            val body = if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                readBodyCapped(conn.inputStream)
-            } else {
-                "Error: ${conn.responseCode}"
-            }
-            ProxyResponse(body, headers)
-        } catch (e: Exception) {
-            ProxyResponse("Error: ${e.message}", emptyMap())
-        } finally {
-            conn?.disconnect()
-        }
-    }
 
     // Forward only subscription-related headers to the client
     private fun sendResponse(output: OutputStream, body: String, headers: Map<String, List<String>>) {
@@ -371,12 +335,14 @@ class SubscriptionService : Service() {
 
     // Minimal HTTP error response
     private fun sendError(output: OutputStream, code: Int, message: String) {
+        val body = message.toByteArray(Charsets.UTF_8)
         val response = "HTTP/1.1 $code Error\r\n" +
             "Content-Type: text/plain; charset=utf-8\r\n" +
+            "Content-Length: ${body.size}\r\n" +
             "Connection: close\r\n" +
-            "\r\n" +
-            message
+            "\r\n"
         output.write(response.toByteArray(Charsets.UTF_8))
+        output.write(body)
         output.flush()
     }
 

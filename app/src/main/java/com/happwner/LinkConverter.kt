@@ -27,6 +27,7 @@ object LinkConverter {
         if (!jsonToUri && !tryBase64 && !xrayToSb) return ConversionStats(input.trim(), 0)
 
         val trimmed = input.trim()
+        JsonSafety.checkDepth(trimmed)
         val compact = isCompactJson(trimmed)
 
         // If the whole body is base64, decode it and recurse
@@ -72,10 +73,27 @@ object LinkConverter {
             if (arr != null) return ConversionStats(arr.text, arr.skipped)
         }
 
+        // Pretty-printed subscriptions are one JSON value, not unrelated lines.
+        if (jsonToUri && (trimmed.startsWith("{") || trimmed.startsWith("[")) && isWholeJsonValue(trimmed)) {
+            val value = JSONTokener(trimmed).nextValue()
+            val objects = if (value is JSONArray) (0 until value.length()).asSequence().map { value.opt(it) }
+                else sequenceOf(value)
+            val result = StringBuilder()
+            for (item in objects) {
+                if (item == null || item === JSONObject.NULL) continue
+                val piece = if (item is JSONObject) {
+                    try { processJson(item) ?: item.toString() } catch (_: Exception) { item.toString() }
+                } else item.toString()
+                if (result.isNotEmpty()) result.append('\n')
+                result.append(piece)
+            }
+            return ConversionStats(result.toString(), 0)
+        }
+
         val res = StringBuilder()
         var skipped = 0
         // Otherwise walk line by line
-        input.lines().forEach { line ->
+        input.lineSequence().forEach { line ->
             val t = line.trim()
             if (t.isEmpty()) return@forEach
             val lineCompact = isCompactJson(t)
@@ -259,7 +277,7 @@ object LinkConverter {
         val res = StringBuilder()
         var totalSkipped = 0
         var anyFiltered = false
-        for (line in input.lines()) {
+        for (line in input.lineSequence()) {
             val tt = line.trim()
             if (tt.isEmpty()) continue
             val one = preFilterUnsupportedXrayOne(tt)
@@ -355,7 +373,7 @@ object LinkConverter {
         }
 
         if (!consumedWhole) {
-            for (line in input.lines()) {
+            for (line in input.lineSequence()) {
                 val t = line.trim()
                 if (t.isEmpty()) continue
                 val consumed = when {
@@ -495,7 +513,7 @@ object LinkConverter {
         if (obs != null) {
             val rem = root.optString("remarks", "")
             for (i in 0 until obs.length()) {
-                val ob = obs.getJSONObject(i)
+                val ob = obs.optJSONObject(i) ?: continue
                 val p = ob.optString("protocol", ob.optString("type"))
                 when (p) {
                     "vless" -> {
@@ -537,7 +555,7 @@ object LinkConverter {
         if (settings != null) {
             val servers = settings.optJSONArray("servers")
             if (servers != null && servers.length() > 0) {
-                val s = servers.getJSONObject(0)
+                val s = servers.optJSONObject(0) ?: return false
                 if (s.has("address") && s.has("port") && s.has("password") && s.has("method")) return true
             }
         }

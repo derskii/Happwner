@@ -154,8 +154,24 @@ The Xray core\'s <tt>geosite:</tt> and <tt>geoip:</tt> rules are converted into 
     <string name="setting_monet_accent">Monet</string>
     <string name="setting_monet_accent_desc">Dynamic color from home screen wallpaper</string>
 
-    <string name="ua_default_happ" translatable="false">Happ/3.26.1</string>
+    <string name="ua_default_happ" translatable="false">Happ/4.10.1</string>
     <string name="ua_default_v2raytun" translatable="false">v2raytun/android</string>
-    <string name="ua_default_incy" translatable="false">INCY/3.3.1</string>
+    <string name="ua_default_incy" translatable="false">INCY/3.9.9</string>
     <string name="ua_select_title">Select User-Agent</string>
+    <string name="ua_default_v2rayng" translatable="false">v2rayNG/2.3.15</string>
+    <string name="ua_default_hiddify" translatable="false">Hiddify/5.5.5</string>
+    <string name="ua_default_singbox" translatable="false">sing-box/1.14.4</string>
+    <string name="ua_default_mihomo" translatable="false">mihomo/1.19.33</string>
+    <string name="ua_system_default">System default (no override)</string>
+    <string name="device_select_title">Request device</string>
+    <string name="request_device">Request as: %1$s</string>
+    <string name="export_subscription">Save subscription to file</string>
+    <string name="export_empty">Fetch a subscription before exporting</string>
+    <string name="export_saved">Subscription saved</string>
+    <string name="export_failed">Could not save the file. Choose another location.</string>
+    <string name="clipboard_too_large">Too much data for the clipboard. Save it to a file instead.</string>
+    <string name="request_failed">Request failed: %1$s</string>
+    <string name="preview_page">\n\nPreview: %1$d–%2$d of %3$d characters. Save to file for the complete subscription.\n</string>
+    <string name="preview_next">Next page</string>
+    <string name="preview_first">First page</string>
 </resources>
