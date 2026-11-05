@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#100f15">
+  <meta name="description" content="Happwner от derskii: выбор устройства, актуальные User-Agent, экспорт подписок в файл и обработка больших JSON. Некоммерческий Android-форк.">
+  <title>Happwner · Подписки под вашим контролем</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#features">К возможностям</a>
+<header class="wrap nav">
+  <a class="brand" href="#"><img src="icon.svg" width="36" height="36" alt=""><span>Happwner <small>/ derskii</small></span></a>
+  <nav aria-label="Навигация"><a href="#features">Возможности</a><a href="#start">Установка</a><a href="https://github.com/derskii/Happwner">GitHub ↗</a></nav>
+</header>
+<main>
+  <section class="wrap hero">
+    <div>
+      <span class="eyebrow"><span class="dot"></span> ANDROID · НЕКОММЕРЧЕСКИЙ ФОРК</span>
+      <h1>Ваши подписки.<br><span>Ваш выбор.</span></h1>
+      <p class="lead">Получайте конфигурации, выбирайте устройство для запроса и сохраняйте результат в файл. Без необходимости выводить огромный JSON на экран целиком.</p>
+      <div class="actions"><a class="button primary" href="https://github.com/derskii/Happwner/releases/latest">Скачать APK <span>↓</span></a><a class="button secondary" href="https://github.com/derskii/Happwner">Исходный код ↗</a></div>
+      <p class="fine">Android 5.0+ <span>•</span> Xposed необязателен <span>•</span> Подписанный APK</p>
+    </div>
+    <div class="app-card" aria-label="Схематичное представление новых возможностей, не скриншот приложения">
+      <div class="card-top"><div class="mini-logo">H</div><strong>Happwner</strong><span class="pill">1.4</span></div>
+      <div class="mock-field"><small>ССЫЛКА НА ПОДПИСКУ</small><code>https://provider.example/sub/••••</code></div>
+      <div class="mock-row"><span>Устройство запроса</span><strong>iPhone / iOS <span aria-hidden="true">⌄</span></strong></div>
+      <div class="mock-row"><span>User-Agent</span><code>Happ/4.10.1/ios</code></div>
+      <div class="mock-divider"></div>
+      <div class="result-label"><span class="dot"></span> ОБРАБОТКА ПОДПИСКИ</div>
+      <div class="code-block"><span>01</span> vless://••••@server.example:443<br><span>02</span> vless://••••@server.example:443<br><span>03</span> vless://••••@server.example:443<br><span>··</span> <em>Постраничный просмотр</em></div>
+      <div class="mock-footer"><span>Полный результат →</span><strong>subscription.txt ↓</strong></div>
+      <span class="illustration-label">Схема возможностей · не скриншот</span>
+    </div>
+  </section>
+
+  <section class="wrap section" id="features">
+    <div class="section-heading"><span class="eyebrow">МЕНЬШЕ РУТИНЫ</span><h2>Небольшие изменения.<br>Больше удобства.</h2><p>На основе Happwner от Omegaplex и slavrom21 — с доработками для повседневного использования.</p></div>
+    <div class="grid">
+      <article class="feature"><span class="feature-number">01 / DEVICE</span><h3>Выберите устройство</h3><p>Android, Android TV, iOS, Windows, macOS и Linux. Профиль задаёт заголовки запроса и платформу в стандартном User-Agent Happ.</p><div class="tags"><span>Android</span><span>iOS</span><span>Desktop</span></div></article>
+      <article class="feature"><span class="feature-number">02 / EXPORT</span><h3>Сохраните в файл</h3><p>Полный обработанный результат в UTF-8, а не обрезанный текст предпросмотра. Выбирайте папку через системный диалог Android.</p><div class="tags"><span>.json</span><span>.txt</span><span>Без доступа ко всем файлам</span></div></article>
+      <article class="feature"><span class="feature-number">03 / PERFORMANCE</span><h3>Большие подписки — частями</h3><p>Конвертация вынесена с UI-потока. Просмотр ограничен страницами по 15 000 символов; полный результат остаётся доступен для экспорта.</p><div class="tags"><span>JSON-массивы</span><span>Многострочный JSON</span></div></article>
+      <article class="feature"><span class="feature-number">04 / RELIABILITY</span><h3>Ошибка — не подписка</h3><p>HTTP 500 с JSON отображается как ошибка. Bridge сохраняет ошибочный статус, вместо того чтобы выдавать его за успешную подписку.</p><div class="tags"><span>Ограничение размера ответа</span><span>Защита глубины JSON</span></div></article>
+    </div>
+  </section>
+
+  <section class="wrap section agents"><div><span class="eyebrow">CLIENT IDENTITY</span><h2>Нужный User-Agent.<br>Без ручного набора.</h2><p>Happ, v2RayTun, INCY, v2rayNG, Hiddify, sing-box и mihomo. Для поддерживаемых установленных Android-клиентов версия берётся с устройства. Ручное редактирование сохранено.</p><p class="fine">Встроенные версии обновлены 5 ноября 2026 года. Реакция на заголовки зависит от провайдера; профиль не меняет физическое устройство и не гарантирует доступ.</p></div><div class="agent-list"><code>Happ / 4.10.1</code><code>INCY / 3.9.9</code><code>v2rayNG / 2.3.15</code><code>Hiddify / 5.5.5</code><code>sing-box / 1.14.4</code><code>mihomo / 1.19.33</code></div></section>
+
+  <section class="wrap section" id="start"><div class="section-heading"><span class="eyebrow">БЫСТРЫЙ СТАРТ</span><h2>От ссылки до файла.</h2></div><ol class="steps"><li><strong>Установите APK</strong><p>Скачайте файл из Releases. Для основных функций root и Xposed не нужны.</p></li><li><strong>Настройте запрос</strong><p>Вставьте ссылку. Выберите устройство, User-Agent и при необходимости свой HWID.</p></li><li><strong>Получите результат</strong><p>Нажмите «Получить прокси», затем значок сохранения рядом с результатом.</p></li></ol>
+    <aside class="notice"><strong>Уже установлен оригинальный Happwner?</strong><p>Подпись этого форка другая. Установить его поверх оригинала нельзя: сначала сохраните нужные данные и удалите оригинал. Идентификатор пакета сохранён для совместимости Xposed. Последующие релизы этого форка используют постоянный собственный ключ.</p></aside>
+  </section>
+
+  <section class="wrap closing"><span class="eyebrow">ПРОЗРАЧНАЯ РАЗРАБОТКА</span><h2>Код открыт.<br>Проверки доступны.</h2><p>Тесты HTTP-ошибок, профилей устройств, предпросмотра и JSON-массивов из 500 и 1000 конфигураций запускаются в GitHub Actions. Автотесты не заменяют проверку на реальном телефоне.</p><div class="actions"><a class="button primary" href="https://github.com/derskii/Happwner/releases/latest">К релизам ↗</a><a class="button secondary" href="https://github.com/derskii/Happwner/actions">Сборки и тесты ↗</a></div></section>
+</main>
+<footer class="wrap"><div><strong>Happwner <small>/ derskii</small></strong><p>Независимый некоммерческий форк. Не связан с разработчиками Happ.</p></div><p>Оригинал: <a href="https://github.com/Omegaplexx/Happwner">Omegaplex &amp; slavrom21</a><br><a href="https://github.com/derskii/Happwner#terms-of-use">Условия использования</a> · <a href="https://github.com/derskii/Happwner/issues">Сообщить об ошибке</a></p></footer>
+</body>
+</html>

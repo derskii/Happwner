@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:labelFor="@id/identityPlatform" android:text="@string/identity_platform" />
+        <Spinner android:id="@+id/identityPlatform" android:layout_width="match_parent"
+            android:layout_height="48dp" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:labelFor="@id/identityDevice" android:text="@string/identity_device" />
+        <Spinner android:id="@+id/identityDevice" android:layout_width="match_parent"
+            android:layout_height="48dp" />
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="@string/identity_model">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/identityModel"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:inputType="text" android:maxLength="80" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="@string/identity_os_version">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/identityOsVersion"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:inputType="text" android:maxLength="30" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="16dp" android:labelFor="@id/identityClient" android:text="@string/identity_client" />
+        <Spinner android:id="@+id/identityClient" android:layout_width="match_parent" android:layout_height="48dp" />
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:hint="@string/hint_hwid">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/identityHwid"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:inputType="textVisiblePassword" android:maxLength="80" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <Button android:id="@+id/identityGenerateHwid" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/hwid_generate" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/identity_explanation" android:textSize="12sp" android:textColor="@color/text_secondary" />
+    </LinearLayout>
+</ScrollView>

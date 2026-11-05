@@ -3,7 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Sideloaded Xposed module: the user can select arbitrary installed hook targets. Not a Play Store release. -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
@@ -120,6 +121,8 @@
 
         <service
             android:name=".BridgeTileService"
+            android:enabled="@bool/quick_settings_available"
+            tools:targetApi="24"
             android:exported="true"
             android:icon="@drawable/ic_bridge_dns_white"
             android:label="@string/tile_bridge_label"

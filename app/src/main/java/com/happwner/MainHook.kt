@@ -14,6 +14,7 @@ import de.robv.android.xposed.*
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import java.net.URL
 
+@android.annotation.SuppressLint("WrongConstant") // Xposed IPC uses the hidden FLAG_RECEIVER_INCLUDE_BACKGROUND bit.
 class MainHook : IXposedHookLoadPackage {
 
     private val MODULE_PACKAGE = "com.happwner"
@@ -632,6 +633,7 @@ class MainHook : IXposedHookLoadPackage {
     }
 
     // Listen for SETTINGS_UPDATE and refresh the RAM cache
+    @android.annotation.SuppressLint("UnspecifiedRegisterReceiverFlag") // API 33+ flags are set in the guarded branch below.
     private fun registerSignalReceiver(context: Context) {
         val filter = IntentFilter("${MODULE_PACKAGE}.SETTINGS_UPDATE")
         val receiver = object : BroadcastReceiver() {

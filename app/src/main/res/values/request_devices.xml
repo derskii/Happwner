@@ -1,10 +1,8 @@
 <resources>
-    <string-array name="request_devices">
+    <string-array name="identity_platforms" translatable="false">
         <item>Android</item>
-        <item>Android TV</item>
-        <item>iPhone / iOS</item>
+        <item>Apple (iPhone / iPad / Mac)</item>
         <item>Windows</item>
-        <item>macOS</item>
         <item>Linux</item>
     </string-array>
 </resources>

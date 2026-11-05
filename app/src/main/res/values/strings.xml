@@ -174,4 +174,17 @@ The Xray core\'s <tt>geosite:</tt> and <tt>geoip:</tt> rules are converted into 
     <string name="preview_page">\n\nPreview: %1$d–%2$d of %3$d characters. Save to file for the complete subscription.\n</string>
     <string name="preview_next">Next page</string>
     <string name="preview_first">First page</string>
+    <string name="identity_platform">1. Platform</string>
+    <string name="identity_device">2. Device preset</string>
+    <string name="identity_model">Device model (editable)</string>
+    <string name="identity_os_version">OS version (editable)</string>
+    <string name="identity_client">3. Client / User-Agent</string>
+    <string name="identity_current_device">This device (%1$s)</string>
+    <string name="identity_keep_ua">Keep current UA: %1$s</string>
+    <string name="identity_apply">Apply profile</string>
+    <string name="identity_required">Enter a value</string>
+    <string name="hwid_generate">Generate HWID</string>
+    <string name="hwid_replace_title">Replace the HWID?</string>
+    <string name="hwid_replace_message">A provider may treat a new ID as another device. The existing value will be replaced only when you apply the profile.</string>
+    <string name="identity_explanation">Presets are examples; model and OS version are editable. HWIDs are synthetic: Android uses 16 hex digits, Apple/Windows a UUID, Linux 32 hex digits. Values are saved per preset and never regenerated automatically. Changing metadata does not guarantee provider compatibility.</string>
 </resources>

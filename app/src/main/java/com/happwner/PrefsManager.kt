@@ -94,6 +94,7 @@ object PrefsManager {
     }
 
     // Push the current HWID / intercept / unlock state to the hooked process
+    @android.annotation.SuppressLint("WrongConstant") // FLAG_RECEIVER_INCLUDE_BACKGROUND is a hidden platform flag.
     fun broadcastSettings(context: Context) {
         val prefs = getSafePrefs(context)
         val custom = prefs.getString("custom_hwid", "") ?: ""
@@ -102,7 +103,7 @@ object PrefsManager {
         val isInterceptEnabled = prefs.getBoolean("intercept_enabled", false)
         val unlockEnabled = isUnlockHookEnabled(context)
 
-        Log.d(TAG, "Broadcasting settings: HWID=$hwidToSend, SpoofActive=$isActive, Unlock=$unlockEnabled")
+        Log.d(TAG, "Broadcasting settings: SpoofActive=$isActive, Unlock=$unlockEnabled")
 
         val intent = Intent("${context.packageName}.SETTINGS_UPDATE").apply {
             putExtra("custom_hwid", hwidToSend)

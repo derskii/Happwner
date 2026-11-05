@@ -269,7 +269,7 @@
                                 android:textColor="@color/text_input_color_selector"
                                 android:imeOptions="actionDone"
                                 android:inputType="text"
-                                android:maxLength="50" />
+                                android:maxLength="80" />
                         </com.google.android.material.textfield.TextInputLayout>
                         <ImageButton
                             android:id="@+id/btnEditHwidManual"

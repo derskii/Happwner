@@ -1,3 +1,52 @@
+<div align="center">
+
+## Happwner · derskii edition
+
+**Your subscriptions. Your choice.**
+
+[![Android](https://github.com/derskii/Happwner/actions/workflows/android.yml/badge.svg)](https://github.com/derskii/Happwner/actions/workflows/android.yml)
+[![Release](https://img.shields.io/github/v/release/derskii/Happwner?color=b89af3)](https://github.com/derskii/Happwner/releases/latest)
+![Android 5.0+](https://img.shields.io/badge/Android-5.0%2B-a9efcd)
+
+[**Download APK**](https://github.com/derskii/Happwner/releases/latest) · [**Project website**](https://derskii.github.io/Happwner/) · [**Русский**](README_RU.md) · [Release notes](RELEASE_NOTES.md)
+
+</div>
+
+An independent, **non-commercial** fork of [Omegaplexx/Happwner](https://github.com/Omegaplexx/Happwner), originally developed by **Omegaplex and slavrom21**.
+
+### What's different?
+
+| Feature | This fork |
+| --- | --- |
+| Request device | Android, Android TV, iOS, Windows, macOS, Linux; saved and included in Bridge URLs |
+| User-Agent | Updated Happ/INCY; added v2rayNG, Hiddify, sing-box and mihomo; editable custom values |
+| File export | Full processed result as UTF-8 `.json` / `.txt` through Android's document picker |
+| Large subscriptions | Background conversion, bounded 15,000-character pages, full export preserved |
+| Error handling | HTTP 500 JSON is an error, not a successful subscription; Bridge preserves failure status |
+| Regression tests | 500/1000 JSON configs, malformed/deep JSON, HTTP errors, request metadata and preview bounds |
+
+> **Installation:** this fork uses its own signing key. It cannot update the original APK in place. Save your data and uninstall the original first. Package ID is retained for Xposed compatibility. Later fork releases use the same persistent key.
+
+Device profiles set request metadata (`x-device-os`, `x-device-model`, Android's `x-ver-os`) and the platform suffix of plain Happ presets. They do not change hardware identity or guarantee provider compatibility. Custom User-Agents and the HWID field remain under your control. To export original JSON rather than converted links, disable the relevant conversion settings before fetching.
+
+### Build & verification
+
+JDK 17 and Android SDK 36:
+
+```sh
+bash gradlew testDebugUnitTest lintDebug assembleDebug
+```
+
+Tagged releases additionally build an R8-optimized APK, sign it using repository secrets, verify the APK signature and publish checksums. Secrets and private keys are never committed. Automated tests do not imply testing on a physical phone.
+
+### User-Agent snapshot
+
+Updated 2026-11-05 from upstream releases: [Happ 4.10.1](https://github.com/Happ-proxy/happ-android/releases/tag/4.10.1), [INCY Android 3.9.9](https://github.com/INCY-DEV/incy-platforms/releases/tag/latest), [v2rayNG 2.3.15](https://github.com/2dust/v2rayNG/releases/tag/2.3.15), [Hiddify 5.5.5](https://github.com/hiddify/hiddify-app/releases/tag/v5.5.5), [sing-box 1.14.4](https://github.com/SagerNet/sing-box/releases/tag/v1.14.4), [mihomo 1.19.33](https://github.com/MetaCubeX/mihomo/releases/tag/v1.19.33). v2RayTun retains its platform-style `v2raytun/android` identifier. Supported installed Android app versions take precedence.
+
+---
+
+## Original project documentation
+
 <p align="center">
   <b>English</b> |
   <a href="README_RU.md">Русский</a>

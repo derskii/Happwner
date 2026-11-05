@@ -232,14 +232,16 @@ class SubscriptionService : Service() {
 
                     // Parse url/hwid/ua, fetch, transform, then reply
                     if (query.isNotEmpty()) {
-                        val params = parseParams(query)
+                        val params = BridgeLink.parse(query)
                         val targetUrl = params["url"]
                         val hwid = params["hwid"] ?: ""
                         val ua = params["ua"] ?: ""
                         val device = RequestDevice.normalize(params["device"])
+                        val model = params["model"].orEmpty()
+                        val osVersion = params["osver"].orEmpty()
 
                         if (targetUrl != null) {
-                            val response = fetchSubscription(targetUrl, hwid, ua, device)
+                            val response = fetchSubscription(targetUrl, hwid, ua, device, osVersion, model)
                             if (!response.successful) {
                                 sendError(output, response.status, response.body)
                                 return@use
@@ -285,29 +287,11 @@ class SubscriptionService : Service() {
         }
     }
 
-    // Parse url-encoded key=value pairs
-    private fun parseParams(query: String): Map<String, String> {
-        val map = mutableMapOf<String, String>()
-        val pairs = query.split("&")
-        for (pair in pairs) {
-            val idx = pair.indexOf("=")
-            if (idx != -1) {
-                val key = pair.substring(0, idx)
-                val value = pair.substring(idx + 1)
-                try {
-                    map[key] = java.net.URLDecoder.decode(value, "UTF-8")
-                } catch (e: Exception) {
-                    map[key] = value
-                }
-            }
-        }
-        return map
-    }
-
-    private suspend fun fetchSubscription(url: String, hwid: String, ua: String, device: String): SubscriptionHttpClient.Response =
+    private suspend fun fetchSubscription(url: String, hwid: String, ua: String, device: String,
+                                          osVersion: String, model: String): SubscriptionHttpClient.Response =
         withContext(Dispatchers.IO) {
             SubscriptionHttpClient.fetch(url, hwid, RequestDevice.userAgent(ua, device),
-                RequestDevice.headers(device, Build.VERSION.RELEASE, Build.MODEL))
+                RequestDevice.headers(device, Build.VERSION.RELEASE, Build.MODEL, osVersion, model))
         }
 
     // Forward only subscription-related headers to the client

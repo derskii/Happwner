@@ -159,4 +159,17 @@
     <string name="preview_page">\n\nПросмотр: %1$d–%2$d из %3$d символов. Полная подписка доступна при сохранении в файл.\n</string>
     <string name="preview_next">Следующая страница</string>
     <string name="preview_first">В начало</string>
+    <string name="identity_platform">1. Платформа</string>
+    <string name="identity_device">2. Модель устройства</string>
+    <string name="identity_model">Модель (можно изменить)</string>
+    <string name="identity_os_version">Версия ОС (можно изменить)</string>
+    <string name="identity_client">3. Клиент / User-Agent</string>
+    <string name="identity_current_device">Это устройство (%1$s)</string>
+    <string name="identity_keep_ua">Оставить текущий UA: %1$s</string>
+    <string name="identity_apply">Применить профиль</string>
+    <string name="identity_required">Введите значение</string>
+    <string name="hwid_generate">Сгенерировать HWID</string>
+    <string name="hwid_replace_title">Заменить HWID?</string>
+    <string name="hwid_replace_message">Провайдер может посчитать новый ID другим устройством. Текущее значение заменится только после применения профиля.</string>
+    <string name="identity_explanation">Пресеты — примеры; модель и версию ОС можно изменить. HWID синтетический: Android — 16 hex-символов, Apple/Windows — UUID, Linux — 32 hex-символа. Значения сохраняются отдельно для каждого пресета и не меняются автоматически. Совместимость зависит от провайдера.</string>
 </resources>

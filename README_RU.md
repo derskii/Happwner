@@ -1,3 +1,41 @@
+<div align="center">
+
+## Happwner · форк derskii
+
+**Ваши подписки. Ваш выбор.**
+
+[![Android](https://github.com/derskii/Happwner/actions/workflows/android.yml/badge.svg)](https://github.com/derskii/Happwner/actions/workflows/android.yml)
+[![Релиз](https://img.shields.io/github/v/release/derskii/Happwner?color=b89af3)](https://github.com/derskii/Happwner/releases/latest)
+
+[**Скачать APK**](https://github.com/derskii/Happwner/releases/latest) · [**Сайт проекта**](https://derskii.github.io/Happwner/) · [Изменения](RELEASE_NOTES.md) · [English](README.md)
+
+</div>
+
+Независимый **некоммерческий** форк [Omegaplexx/Happwner](https://github.com/Omegaplexx/Happwner). Авторы оригинала — **Omegaplex и slavrom21**; их условия использования сохранены.
+
+### Что добавлено
+
+- **Выбор устройства запроса:** Android, Android TV, iPhone/iOS, Windows, macOS и Linux. Выбор сохраняется и передаётся в Bridge-ссылке.
+- **User-Agent:** актуализированы Happ/INCY, добавлены v2rayNG, Hiddify, sing-box и mihomo. Для поддерживаемых установленных Android-приложений берётся версия с устройства. Поле можно редактировать вручную.
+- **Экспорт в файл:** значок сохранения рядом с результатом → системный выбор папки → полный результат в UTF-8 `.json` / `.txt`, без обрезки предпросмотра и доступа ко всем файлам.
+- **Большие JSON:** обработка вне UI-потока, предпросмотр страницами по 15 000 символов; добавлены регрессионные тесты на массивы из 500 и 1000 конфигов.
+- **Ошибки HTTP:** ответ 500 с JSON показывается как ошибка; Bridge больше не маскирует его статусом 200.
+- **Дополнительные исправления:** защита глубины JSON, ограничение ответа и буфера обмена, отмена устаревших результатов, привязка Bridge только к localhost.
+
+> **Переход с оригинала:** подпись этого APK другая. Сохраните нужные данные и удалите оригинал перед установкой. Идентификатор пакета сохранён для Xposed. Последующие релизы форка подписываются одним постоянным ключом.
+
+Профиль устройства меняет только заголовки запроса (`x-device-os`, `x-device-model`, для Android — `x-ver-os`) и платформу в стандартном UA Happ. Он не меняет физическое устройство и не гарантирует реакцию провайдера. HWID и пользовательский UA остаются отдельными настройками. Чтобы сохранить исходный JSON вместо ссылок, перед запросом отключите соответствующую конвертацию в настройках.
+
+### Проверки и сборка
+
+JDK 17, Android SDK 36: `bash gradlew testDebugUnitTest lintDebug assembleDebug`. GitHub Actions запускает тесты и lint; релизы дополнительно собираются с оптимизацией R8, подписываются отдельным ключом и получают файл SHA-256. Ключи не публикуются в исходниках. Проверка на реальном телефоне не проводилась.
+
+Снимок UA от 05.11.2026: Happ 4.10.1, INCY 3.9.9, v2rayNG 2.3.15, Hiddify 5.5.5, sing-box 1.14.4, mihomo 1.19.33. Источники — в [English README](README.md#user-agent-snapshot).
+
+---
+
+## Документация оригинального проекта
+
 <p align="center">
   <a href="README.md">English</a> |
   <b>Русский</b>

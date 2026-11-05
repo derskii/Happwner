@@ -7,10 +7,8 @@ import android.os.Build
 import android.os.Bundle
 import android.text.Html
 import android.text.InputFilter
-import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
-import android.text.TextPaint
 import android.text.TextUtils
 import android.text.style.ClickableSpan
 import android.text.style.ForegroundColorSpan
@@ -21,7 +19,6 @@ import android.transition.TransitionSet
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.view.inputmethod.InputMethodManager
 import android.widget.*
@@ -32,12 +29,10 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.core.text.PrecomputedTextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsAnimationCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.color.MaterialColors
@@ -98,12 +93,14 @@ class MainActivity : AppCompatActivity() {
 
     private var fullResponseText: String = ""
     private var fetchJob: kotlinx.coroutines.Job? = null
-    private var pendingExportText: String? = null
+    private val exportState by lazy { androidx.lifecycle.ViewModelProvider(this)[ExportState::class.java] }
     private val exportLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        val text = pendingExportText
-        pendingExportText = null
+        val text = exportState.text
+        exportState.text = null
         val uri = result.data?.data
-        if (result.resultCode == RESULT_OK && uri != null && text != null) {
+        if (result.resultCode == RESULT_OK && uri != null && text == null) {
+            Toast.makeText(this, R.string.export_empty, Toast.LENGTH_LONG).show()
+        } else if (result.resultCode == RESULT_OK && uri != null && text != null) {
             lifecycleScope.launch {
                 try {
                     withContext(Dispatchers.IO) {
@@ -563,7 +560,7 @@ class MainActivity : AppCompatActivity() {
         // Copy / clear the output
         btnCopyOutput.setOnClickListener {
             if (fullResponseText.isNotEmpty() && fullResponseText != getString(R.string.label_result_default) && fullResponseText != getString(R.string.msg_loading)) {
-                if (fullResponseText.toByteArray(Charsets.UTF_8).size > 256 * 1024) {
+                if (fullResponseText.length > 64 * 1024) {
                     Toast.makeText(this, R.string.clipboard_too_large, Toast.LENGTH_LONG).show()
                     exportSubscription()
                 } else {
@@ -578,20 +575,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.btnExportOutput).setOnClickListener { exportSubscription() }
-        val deviceButton = findViewById<Button>(R.id.btnRequestDevice)
-        fun updateDeviceLabel() {
-            val index = RequestDevice.ids.indexOf(selectedDevice())
-            deviceButton.text = getString(R.string.request_device, resources.getStringArray(R.array.request_devices)[index])
-        }
         updateDeviceLabel()
-        deviceButton.setOnClickListener {
-            AnimatedDialogBuilder(this)
-                .setTitle(R.string.device_select_title)
-                .setSingleChoiceItems(R.array.request_devices, RequestDevice.ids.indexOf(selectedDevice())) { dialog, index ->
-                    prefs.edit().putString("request_device", RequestDevice.ids[index]).apply()
-                    updateDeviceLabel()
-                    dialog.dismiss()
-                }.show()
+        findViewById<View>(R.id.btnRequestDevice).setOnClickListener {
+            RequestIdentityDialog.show(this, prefs, inputHwid.text.toString(), inputUserAgent.text.toString(), uaPresets()) { selection ->
+                prefs.edit().putString("request_device", selection.profile)
+                    .putString("identity_model_${selection.profile}", selection.model)
+                    .putString("identity_version_${selection.profile}", selection.version)
+                    .putString("identity_hwid_${selection.profile}", selection.hwid)
+                    .putString("custom_hwid", selection.hwid)
+                    .putString("custom_user_agent", selection.ua)
+                    .putBoolean("use_custom_hwid_input", true).apply()
+                inputHwid.isEnabled = true
+                inputHwid.setText(selection.hwid)
+                inputUserAgent.setText(selection.ua)
+                updateDeviceLabel()
+                refreshAllFieldsStyle(false)
+                PrefsManager.broadcastSettings(this)
+            }
         }
 
         btnClearOutput.setOnClickListener {
@@ -696,10 +696,7 @@ class MainActivity : AppCompatActivity() {
 
             val copyAction = {
                 try {
-                    val encodedUrl = URLEncoder.encode(urlString, "UTF-8")
-                    val encodedHwid = URLEncoder.encode(hwid, "UTF-8")
-                    val encodedUa = URLEncoder.encode(userAgent, "UTF-8")
-                    val bridgeUrl = "http://127.0.0.1:8166/url=$encodedUrl&hwid=$encodedHwid&ua=$encodedUa&device=${selectedDevice()}"
+                    val bridgeUrl = currentBridgeUrl(urlString, hwid, userAgent)
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     val clip = ClipData.newPlainText("Happwner Bridge URL", bridgeUrl)
                     clipboard.setPrimaryClip(clip)
@@ -752,6 +749,8 @@ class MainActivity : AppCompatActivity() {
             val hwid = inputHwid.text.toString().trim()
             val userAgent = inputUserAgent.text.toString().replace("\n", "").replace("\r", "").trim()
             val device = selectedDevice()
+            val model = selectedModel()
+            val osVersion = selectedOsVersion()
 
             if (urlString.startsWith("happ://crypt")) {
                 Toast.makeText(this, getString(R.string.error_decrypt_first), Toast.LENGTH_SHORT).show()
@@ -832,7 +831,7 @@ class MainActivity : AppCompatActivity() {
             // Off the main thread: fetch, decrypt, convert, then render with labels
             fetchJob = lifecycleScope.launch {
               try {
-                val resp = makeRequest(urlString, hwid, userAgent, device)
+                val resp = makeRequest(urlString, hwid, userAgent, device, osVersion, model)
                 val jsonToUri = prefs.getBoolean("process_manual", true)
                 val tryB64 = prefs.getBoolean("process_b64_manual", true)
                 val xrayToSb = prefs.getBoolean("process_xray_manual", false)
@@ -1145,10 +1144,7 @@ class MainActivity : AppCompatActivity() {
         val userAgent = inputUserAgent.text.toString().replace("\n", "").replace("\r", "").trim()
 
         try {
-            val encodedUrl = URLEncoder.encode(urlString, "UTF-8")
-            val encodedHwid = URLEncoder.encode(hwid, "UTF-8")
-            val encodedUa = URLEncoder.encode(userAgent, "UTF-8")
-            val bridgeUrl = "http://127.0.0.1:8166/url=$encodedUrl&hwid=$encodedHwid&ua=$encodedUa"
+            val bridgeUrl = currentBridgeUrl(urlString, hwid, userAgent)
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("Happwner Bridge URL", bridgeUrl)
             clipboard.setPrimaryClip(clip)
@@ -1331,13 +1327,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectedDevice(): String = RequestDevice.normalize(prefs.getString("request_device", "android"))
 
+    private fun updateDeviceLabel() {
+        val profile = DeviceProfiles.find(selectedDevice())
+        findViewById<Button>(R.id.btnRequestDevice).text =
+            getString(R.string.request_device, "${selectedModel()} · ${profile.os} ${selectedOsVersion()}")
+    }
+
+    private fun selectedModel(): String = prefs.getString("identity_model_${selectedDevice()}", null)
+        ?: DeviceProfiles.find(selectedDevice()).let { if (it.id == "android") Build.MODEL else it.model }
+
+    private fun selectedOsVersion(): String = prefs.getString("identity_version_${selectedDevice()}", null)
+        ?: DeviceProfiles.find(selectedDevice()).let { if (it.id == "android") Build.VERSION.RELEASE else it.version }
+
+    private fun currentBridgeUrl(url: String, hwid: String, ua: String): String =
+        BridgeLink.create(url, hwid, ua, selectedDevice(), selectedOsVersion(), selectedModel())
+
     private fun exportSubscription() {
         if (fullResponseText.isEmpty()) {
             Toast.makeText(this, R.string.export_empty, Toast.LENGTH_SHORT).show()
             return
         }
         val name = SubscriptionPreview.fileName(fullResponseText)
-        pendingExportText = fullResponseText
+        exportState.text = fullResponseText
         try {
             exportLauncher.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
                 addCategory(Intent.CATEGORY_OPENABLE)
@@ -1345,7 +1356,7 @@ class MainActivity : AppCompatActivity() {
                 putExtra(Intent.EXTRA_TITLE, name)
             })
         } catch (_: ActivityNotFoundException) {
-            pendingExportText = null
+            exportState.text = null
             Toast.makeText(this, R.string.export_failed, Toast.LENGTH_LONG).show()
         }
     }
@@ -1404,29 +1415,19 @@ class MainActivity : AppCompatActivity() {
                 bridgeUrl.substringAfter("/url=")
             } else return
 
-            val pairs = ("url=" + queryPart).split("&")
-            var url: String? = null
-            var hwid: String? = null
-            var ua: String? = null
-
-            for (pairStr in pairs) {
-                val pair = pairStr.split("=", limit = 2)
-                if (pair.size < 2) continue
-                val key = pair[0]
-                val value = android.net.Uri.decode(pair[1])
-                when (key) {
-                    "url" -> url = value
-                    "hwid" -> hwid = value
-                    "ua" -> ua = value
-                }
-            }
-
-            url?.let { inputUrl.setText(it) }
-            hwid?.let {
+            val params = BridgeLink.parse("url=$queryPart")
+            val device = RequestDevice.normalize(params["device"])
+            params["url"]?.let { inputUrl.setText(it) }
+            params["hwid"]?.let {
                 if (!inputHwid.isEnabled) handleToggleHwidEdit(true)
                 inputHwid.setText(it)
             }
-            ua?.let { inputUserAgent.setText(it) }
+            params["ua"]?.let { inputUserAgent.setText(it) }
+            prefs.edit().putString("request_device", device).apply {
+                params["model"]?.let { putString("identity_model_$device", it) }
+                params["osver"]?.let { putString("identity_version_$device", it) }
+            }.apply()
+            updateDeviceLabel()
         } catch (e: Exception) {}
     }
 
@@ -1609,11 +1610,10 @@ class MainActivity : AppCompatActivity() {
         val displayId = if (isFullActive && !isInputEnabled) {
             prefs.getString("captured_id", "") ?: ""
         } else {
-            val custom = prefs.getString("custom_hwid", "") ?: ""
-            if (custom.isNotEmpty()) custom else prefs.getString("captured_id", "") ?: ""
+            prefs.getString("custom_hwid", null) ?: prefs.getString("captured_id", "") ?: ""
         }
 
-        if (inputHwid.text?.toString() != displayId && displayId.isNotEmpty()) {
+        if (inputHwid.text?.toString() != displayId) {
             inputHwid.setText(displayId)
         }
         updateHwidHintVisibility(inputHwid.text?.toString())
@@ -1863,8 +1863,7 @@ class MainActivity : AppCompatActivity() {
     // Installed versions take precedence; custom strings remain editable.
     private fun showUaSelectDialog() {
         val current = inputUserAgent.text.toString().trim()
-        val values = listOf("", uaForMode("happ"), uaForMode("v2raytun"), uaForMode("incy"),
-            uaForMode("v2rayng"), uaForMode("hiddify"), uaForMode("singbox"), uaForMode("mihomo"))
+        val values = uaPresets()
         val labels = values.map { it.ifEmpty { getString(R.string.ua_system_default) } }.toTypedArray()
         AnimatedDialogBuilder(this)
             .setTitle(getString(R.string.ua_select_title))
@@ -1873,6 +1872,9 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
             }.show()
     }
+
+    private fun uaPresets(): List<String> = listOf("", uaForMode("happ"), uaForMode("v2raytun"), uaForMode("incy"),
+        uaForMode("v2rayng"), uaForMode("hiddify"), uaForMode("singbox"), uaForMode("mihomo"))
 
     private fun fromHtml(text: String): CharSequence {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -2081,10 +2083,11 @@ class MainActivity : AppCompatActivity() {
         try { unregisterReceiver(receiver) } catch (e: Exception) {}
     }
 
-    private suspend fun makeRequest(url: String, hwid: String, ua: String, device: String): SubscriptionHttpClient.Response =
+    private suspend fun makeRequest(url: String, hwid: String, ua: String, device: String,
+                                    osVersion: String, model: String): SubscriptionHttpClient.Response =
         withContext(Dispatchers.IO) {
             SubscriptionHttpClient.fetch(url, hwid, RequestDevice.userAgent(ua, device),
-                RequestDevice.headers(device, Build.VERSION.RELEASE, Build.MODEL),
+                RequestDevice.headers(device, Build.VERSION.RELEASE, Build.MODEL, osVersion, model),
                 resources.getInteger(R.integer.network_timeout_ms))
         }
 
