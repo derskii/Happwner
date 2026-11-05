@@ -80,4 +80,27 @@ class RequestIdentityDialogTest {
         assertFalse(PrefsManager.getSafePrefs(activity).contains("request_device"))
         assertEquals("", activity.findViewById<EditText>(R.id.inputHwid).text.toString())
     }
+
+    @Test fun `saved profile restores its own HWID and client when selected again`() {
+        val prefs = PrefsManager.getSafePrefs(activity)
+        prefs.edit().putString("identity_hwid_iphone11", "SAVED-IPHONE-ID")
+            .putString("identity_ua_iphone11", "MyCustomClient/7").commit()
+        val dialog = open()
+        select(dialog, R.id.identityPlatform, DeviceProfiles.groups.indexOf("apple"))
+        select(dialog, R.id.identityDevice, DeviceProfiles.inGroup("apple").indexOfFirst { it.id == "iphone11" })
+        assertEquals("SAVED-IPHONE-ID", dialog.findViewById<EditText>(R.id.identityHwid)!!.text.toString())
+        dialog.getButton(DialogInterface.BUTTON_POSITIVE).performClick()
+        assertEquals("MyCustomClient/7", prefs.getString("custom_user_agent", null))
+        assertEquals("SAVED-IPHONE-ID", activity.findViewById<EditText>(R.id.inputHwid).text.toString())
+    }
+
+    @Test fun `replacing an existing HWID requires confirmation and cancelling keeps it`() {
+        val dialog = open()
+        dialog.findViewById<EditText>(R.id.identityHwid)!!.setText("EXISTING-ID")
+        dialog.findViewById<View>(R.id.identityGenerateHwid)!!.performClick()
+        val confirmation = ShadowDialog.getLatestDialog() as AlertDialog
+        assertNotSame(dialog, confirmation)
+        confirmation.getButton(DialogInterface.BUTTON_NEGATIVE).performClick()
+        assertEquals("EXISTING-ID", dialog.findViewById<EditText>(R.id.identityHwid)!!.text.toString())
+    }
 }

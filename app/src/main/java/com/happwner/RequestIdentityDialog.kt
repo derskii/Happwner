@@ -27,6 +27,12 @@ object RequestIdentityDialog {
         fun adapter(labels: List<String>) = ArrayAdapter(activity, android.R.layout.simple_spinner_item, labels).apply {
             setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         }
+        val baseAgents = listOf(currentUa) + agents
+        val savedAgents = DeviceProfiles.all.mapNotNull { prefs.getString("identity_ua_${it.id}", null) }
+            .distinct().filterNot { it in baseAgents }
+        val uaValues = baseAgents + savedAgents
+        client.adapter = adapter(listOf(activity.getString(R.string.identity_keep_ua, currentUa.ifBlank { "—" })) +
+            (agents + savedAgents).map { it.ifEmpty { activity.getString(R.string.ua_system_default) } })
         fun listener(action: (Int) -> Unit) = object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, v: View?, position: Int, id: Long) = action(position)
             override fun onNothingSelected(parent: AdapterView<*>?) {}
@@ -38,6 +44,8 @@ object RequestIdentityDialog {
             model.setText(prefs.getString("identity_model_${p.id}", if (p.id == "android") Build.MODEL else p.model))
             version.setText(prefs.getString("identity_version_${p.id}", if (p.id == "android") Build.VERSION.RELEASE else p.version))
             hwid.setText(if (p.id == selected.id) currentHwid else prefs.getString("identity_hwid_${p.id}", ""))
+            val ua = if (p.id == selected.id) currentUa else prefs.getString("identity_ua_${p.id}", currentUa)
+            client.setSelection(uaValues.indexOf(ua).coerceAtLeast(0))
         }
         fun fillDevices(groupIndex: Int) {
             profiles = DeviceProfiles.inGroup(DeviceProfiles.groups[groupIndex])
@@ -58,9 +66,6 @@ object RequestIdentityDialog {
         platform.onItemSelectedListener = listener { index ->
             if (profiles.firstOrNull()?.group != DeviceProfiles.groups[index]) fillDevices(index)
         }
-        val uaValues = listOf(currentUa) + agents
-        client.adapter = adapter(listOf(activity.getString(R.string.identity_keep_ua, currentUa.ifBlank { "—" })) +
-            agents.map { it.ifEmpty { activity.getString(R.string.ua_system_default) } })
         view.findViewById<View>(R.id.identityGenerateHwid).setOnClickListener {
             val generate = { hwid.setText(HwidGenerator.generate(activeId ?: "android")) }
             if (hwid.text.isNotBlank()) {

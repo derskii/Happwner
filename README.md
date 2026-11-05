@@ -18,7 +18,8 @@ An independent, **non-commercial** fork of [Omegaplexx/Happwner](https://github.
 
 | Feature | This fork |
 | --- | --- |
-| Request device | Android, Android TV, iOS, Windows, macOS, Linux; saved and included in Bridge URLs |
+| Request identity | Platform → device model → editable OS version → client; Pixel, Galaxy, iPhone 11–16, iPad, Mac, Windows 10/11, Linux and Android TV presets |
+| HWID generation | Explicit generation in platform-appropriate formats; saved per preset, never silently regenerated |
 | User-Agent | Updated Happ/INCY; added v2rayNG, Hiddify, sing-box and mihomo; editable custom values |
 | File export | Full processed result as UTF-8 `.json` / `.txt` through Android's document picker |
 | Large subscriptions | Background conversion, bounded 15,000-character pages, full export preserved |
@@ -27,7 +28,9 @@ An independent, **non-commercial** fork of [Omegaplexx/Happwner](https://github.
 
 > **Installation:** this fork uses its own signing key. It cannot update the original APK in place. Save your data and uninstall the original first. Package ID is retained for Xposed compatibility. Later fork releases use the same persistent key.
 
-Device profiles set request metadata (`x-device-os`, `x-device-model`, Android's `x-ver-os`) and the platform suffix of plain Happ presets. They do not change hardware identity or guarantee provider compatibility. Custom User-Agents and the HWID field remain under your control. To export original JSON rather than converted links, disable the relevant conversion settings before fetching.
+Open **Request as** to select a platform, then a device (for example **Apple → iPhone 11** or **Windows → Windows 10 PC**), edit the model/OS version and select a client. Generate an HWID only if needed, then apply. Cancelling leaves your current identity unchanged. Applied values are remembered separately for each device preset.
+
+Profiles set request metadata (`x-device-os`, `x-device-model`, `x-ver-os`) and the platform of standard Happ/v2RayTun presets. Synthetic HWIDs use 16 lowercase hex digits for Android/TV, UUIDs for Apple/Windows, and 32 lowercase hex digits for Linux. They are **not** real device IDs or hardware attestation; provider requirements differ. Custom User-Agents and the HWID field remain editable. To export original JSON rather than converted links, disable the relevant conversion settings before fetching.
 
 ### Build & verification
 
@@ -37,7 +40,7 @@ JDK 17 and Android SDK 36:
 bash gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-Tagged releases additionally build an R8-optimized APK, sign it using repository secrets, verify the APK signature and publish checksums. Secrets and private keys are never committed. Automated tests do not imply testing on a physical phone.
+Tagged releases additionally build an R8-optimized APK, sign it using repository secrets, verify the APK signature and publish checksums. Secrets and private keys are never committed. Robolectric exercises the identity dialog on Android API 28 and 35; automated tests do not imply testing on a physical phone.
 
 ### User-Agent snapshot
 

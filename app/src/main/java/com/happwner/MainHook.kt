@@ -673,6 +673,7 @@ class MainHook : IXposedHookLoadPackage {
 }
 
 // Tell the app the real android_id we observed (for history/UI)
+@android.annotation.SuppressLint("WrongConstant") // FLAG_RECEIVER_INCLUDE_BACKGROUND is a hidden platform flag.
 private fun sendIdCapturedBroadcast(originalId: String) {
     if (originalId.isEmpty()) return
     try {

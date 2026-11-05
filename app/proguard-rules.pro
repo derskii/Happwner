@@ -1,4 +1,6 @@
 # Сохраняем класс входа для Xposed
+-dontwarn de.robv.android.xposed.**
+# Xposed API classes are provided by the hooking framework, not bundled in the APK.
 -keep class com.happwner.MainHook { *; }
 
 # Сохраняем метод проверки статуса модуля, чтобы Xposed мог его найти по имени

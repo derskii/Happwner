@@ -40,7 +40,6 @@ import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URLEncoder
 
 class MainActivity : AppCompatActivity() {
 
@@ -84,10 +83,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var output: TextView
     private lateinit var outputWaitLabel: TextView
-    private var outputExpanding = false
     private var blockOutputTouch = false
-    private var outputExpandAborted = false
-    private var expandJob: kotlinx.coroutines.Job? = null
     private lateinit var btnGetSub: Button
     private lateinit var btnPasteUrlManual: ImageButton
 
@@ -469,7 +465,8 @@ class MainActivity : AppCompatActivity() {
             override fun afterTextChanged(s: android.text.Editable?) {
                 val text = s.toString()
                 if (inputHwid.isEnabled) {
-                    prefs.edit().putString("custom_hwid", text).apply()
+                    prefs.edit().putString("custom_hwid", text)
+                        .putString("identity_hwid_${selectedDevice()}", text).apply()
                     fixSharedPrefs()
                 }
                 updateHwidHintVisibility(text)
@@ -482,7 +479,8 @@ class MainActivity : AppCompatActivity() {
             private var lastLineCount = 1
 
             override fun afterTextChanged(s: android.text.Editable?) {
-                prefs.edit().putString("custom_user_agent", s.toString()).apply()
+                prefs.edit().putString("custom_user_agent", s.toString())
+                    .putString("identity_ua_${selectedDevice()}", s.toString()).apply()
                 val currentLineCount = inputUserAgent.lineCount
                 if (currentLineCount != lastLineCount) {
                     val transitionDurationMs = resources.getInteger(R.integer.duration_fast_transition).toLong()
@@ -526,8 +524,6 @@ class MainActivity : AppCompatActivity() {
         // Collapse / expand the output section
         outputHeader.setOnClickListener {
             currentFocus?.clearFocus()
-            outputExpandAborted = true
-            expandJob?.cancel()
             output.animate().cancel()
             output.alpha = 1f
             hideWaitLabel()
@@ -582,6 +578,7 @@ class MainActivity : AppCompatActivity() {
                     .putString("identity_model_${selection.profile}", selection.model)
                     .putString("identity_version_${selection.profile}", selection.version)
                     .putString("identity_hwid_${selection.profile}", selection.hwid)
+                    .putString("identity_ua_${selection.profile}", selection.ua)
                     .putString("custom_hwid", selection.hwid)
                     .putString("custom_user_agent", selection.ua)
                     .putBoolean("use_custom_hwid_input", true).apply()
@@ -601,9 +598,6 @@ class MainActivity : AppCompatActivity() {
             pendingConfigText = null
             mainContainer.beginDelayedTransitionIfEnabled(fastTransition)
             fullResponseText = ""
-            outputExpandAborted = true
-            expandJob?.cancel()
-            outputExpanding = false
             output.animate().cancel()
             output.alpha = 1f
             hideWaitLabel()
@@ -807,9 +801,6 @@ class MainActivity : AppCompatActivity() {
             pendingConfigText = null
             loadingPhaseRunning = true
             fullResponseText = ""
-            outputExpandAborted = true
-            expandJob?.cancel()
-            outputExpanding = false
             hideWaitLabel()
 
             output.crossfadeContent(onEnd = {
@@ -1417,16 +1408,16 @@ class MainActivity : AppCompatActivity() {
 
             val params = BridgeLink.parse("url=$queryPart")
             val device = RequestDevice.normalize(params["device"])
+            prefs.edit().putString("request_device", device).apply {
+                params["model"]?.let { putString("identity_model_$device", it) }
+                params["osver"]?.let { putString("identity_version_$device", it) }
+            }.apply()
             params["url"]?.let { inputUrl.setText(it) }
             params["hwid"]?.let {
                 if (!inputHwid.isEnabled) handleToggleHwidEdit(true)
                 inputHwid.setText(it)
             }
             params["ua"]?.let { inputUserAgent.setText(it) }
-            prefs.edit().putString("request_device", device).apply {
-                params["model"]?.let { putString("identity_model_$device", it) }
-                params["osver"]?.let { putString("identity_version_$device", it) }
-            }.apply()
             updateDeviceLabel()
         } catch (e: Exception) {}
     }
